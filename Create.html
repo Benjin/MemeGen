@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<meta charset="UTF-8"> 
+<html>
+	<body>
+		<canvas id="canvas" width="500" height="500" style="border:1px solid #c3c3c3;" />
+		</canvas>
+		<img id="canvasImage" />
+
+		<br /><br />
+
+		Image URI: <input type="text" id="imageUri" size="40"><button id="applyImage" onclick="setBackground()">Apply</button>
+
+		<br /><br />
+
+		Top: <input type="text" id="topText" onkeypress="redraw()" onkeyup="redraw()"><br />
+
+		<input type="radio" name="topAlignment" id="TopLeftAlign" checked onchange="redraw()"><label for="TopLeftAlign">Left</label><br />
+		<input type="radio" name="topAlignment" id="TopCenterAlign" onchange="redraw()"><label for="TopCenterAlign">Center</label><br />
+		<input type="radio" name="topAlignment" id="TopRightAlign" onchange="redraw()"><label for="TopRightAlign">Right</label><br />
+
+
+		Middle: <input type="text" id="middleText" onkeypress="redraw()" onkeyup="redraw()""><br />
+
+		<input type="radio" name="midAlignment" id="MidLeftAlign" checked onchange="redraw()"><label for="MidLeftAlign">Left</label><br />
+		<input type="radio" name="midAlignment" id="MidCenterAlign" onchange="redraw()"><label for="MidCenterAlign">Center</label><br />
+		<input type="radio" name="midAlignment" id="MidRightAlign" onchange="redraw()"><label for="MidRightAlign">Right</label><br />
+
+		Bottom: <input type="text" id="bottomText" onkeypress="redraw()" onkeyup="redraw()""><br />
+
+		<input type="radio" name="botAlignment" id="BotLeftAlign" checked onchange="redraw()"><label for="BotLeftAlign">Left</label><br />
+		<input type="radio" name="botAlignment" id="BotCenterAlign" onchange="redraw()"><label for="BotCenterAlign">Center</label><br />
+		<input type="radio" name="botAlignment" id="BotRightAlign" onchange="redraw()"><label for="BotRightAlign">Right</label><br />
+
+		<script>
+			var margin = 15;
+			var backgroundUri = "";
+
+			var VertAlignment = Object.freeze({
+				"Top":0,
+				"Middle":1,
+				"Bottom":2
+			});
+
+			var HorAlignment = Object.freeze({
+				"Left":0,
+				"Center":1,
+				"Right":2
+			});			
+
+			function setBackground(){
+				var c = document.getElementById("canvas");
+				backgroundUri = document.getElementById("imageUri").value;
+
+				c.style = "border:1px solid #c3c3c3; background-image:url('" + backgroundUri + "');background-repeat: no-repeat;background-size: 100% 100%;";
+			}
+
+			function redraw(){
+				var c = document.getElementById("canvas");
+				var context = c.getContext("2d");
+				context.clearRect(0, 0, canvas.width, canvas.height);
+
+				var imageObj = new Image();
+
+				if (backgroundUri == ""){
+					drawTextLayer(c, context);
+				}
+				else{
+					imageObj.onload = function() {
+						context.drawImage(imageObj, 0, 0, 500, 500);
+						drawTextLayer(c, context);
+					};
+
+					imageObj.src = backgroundUri;
+				}
+			}
+
+			function drawTextLayer(canvas, context)
+			{
+				context.fillStyle = 'white';
+				context.strokeStyle = 'black';
+
+				var fontName = "Impact";
+
+				var topText = document.getElementById("topText").value;
+				var midText = document.getElementById("middleText").value;
+				var botText = document.getElementById("bottomText").value;
+				
+				if (topText.trim() != "")
+					drawText(context, topText, fontName, VertAlignment.Top,    getHorizontalAlignment("Top"));
+				if (midText.trim() != "")
+					drawText(context, midText, fontName, VertAlignment.Middle, getHorizontalAlignment("Mid"));
+				if (botText.trim() != "")
+					drawText(context, botText, fontName, VertAlignment.Bottom, getHorizontalAlignment("Bot"));
+
+				var dataURL = canvas.toDataURL();
+			}
+
+			function getHorizontalAlignment(vertName){
+				var horAlign = HorAlignment.Left;
+				if (document.getElementById(vertName + 'CenterAlign').checked)
+					horAlign = HorAlignment.Center;
+				else if (document.getElementById(vertName + 'RightAlign').checked)
+					horAlign = HorAlignment.Right;
+
+				return horAlign
+			}
+
+			function drawText(context, text, fontName, vertAlign, horAlign){
+				var textInfo = calcSize(context, text, fontName);
+				var fontSize = textInfo[0];
+				var lines = textInfo[1];
+				context.font = createFontString(fontSize, fontName);
+
+				var x = margin;
+				var y = fontSize + margin;
+				var yOffset = 0;
+
+				if (vertAlign == VertAlignment.Middle){
+					yOffset = (document.getElementById("canvas").height - ((fontSize + margin) * lines.length)) / 2;
+				}
+				else if (vertAlign == VertAlignment.Bottom){
+					yOffset = (document.getElementById("canvas").height - margin - ((fontSize + margin) * lines.length));
+				}
+
+				for (var i = 0; i < lines.length; i++) {
+					if (horAlign == HorAlignment.Center){
+						x = (document.getElementById("canvas").width - context.measureText(lines[i]).width) / 2;
+					}
+					else if (horAlign == HorAlignment.Right){
+						x = document.getElementById("canvas").width - margin - context.measureText(lines[i]).width;
+					}
+
+					context.fillText(lines[i], x, y*(i+1) + yOffset);
+					context.strokeText(lines[i], x, y*(i+1) + yOffset);
+				}
+			}
+
+			function createFontString(fontSize, fontName){
+				 return fontSize + 'pt ' + fontName;
+			}
+
+			function calcSize(context, text, fontName){
+				var maxSize = 64;
+				var minSize = 24;
+				var maxWidth = document.getElementById("canvas").width - (2 * margin);
+
+				var size = maxSize;
+
+
+				context.font = createFontString(size, fontName);
+
+				// shrink
+				while (context.measureText(text).width > maxWidth && size >= minSize)
+					context.font = --size + 'pt Impact';
+
+				// if unable to shrink enough, multi-line
+				if (size <= minSize && context.measureText(text).width > maxWidth){
+					var lines = [];
+					var words = text.split(' ');
+					var currentLine = "";
+
+					while (words.length > 0){
+
+						var current = words.shift();
+						var testLine = currentLine + " " + current;
+
+						if (context.measureText(testLine).width <= maxWidth){
+							currentLine = testLine;
+							continue;
+						}
+						else {
+							lines.push(currentLine);
+							currentLine = current;
+						}
+					}
+
+					lines.push(currentLine);
+
+					return [size, lines];
+				}
+
+				return [size, [text]];
+			}
+		</script>
+	</body>
+</html>
